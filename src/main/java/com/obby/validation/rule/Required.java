@@ -4,17 +4,17 @@ import com.obby.validation.Rule;
 import org.apache.commons.lang3.ObjectUtils;
 
 /**
- * 必填校验类
+ * 必填数据验证类
  *
  * @author obby-xiang
  * @since 2021-01-28
  */
-public class Required extends Rule<Object> {
+public class Required extends Rule<Object, Required> {
 
     /**
-     * 默认消息
+     * 默认验证消息
      *
-     * @return 默认消息
+     * @return 默认验证消息
      */
     @Override
     public String defaultMessage() {
@@ -22,7 +22,7 @@ public class Required extends Rule<Object> {
     }
 
     /**
-     * 测试
+     * 测试数据
      *
      * @param data 测试对象
      * @return 是否通过测试

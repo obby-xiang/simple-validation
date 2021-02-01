@@ -1,21 +1,20 @@
 package com.obby.validation;
 
+import org.apache.commons.lang3.ObjectUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.beans.BeanWrapper;
-import org.springframework.beans.BeanWrapperImpl;
+import org.springframework.beans.DirectFieldAccessor;
+import org.springframework.lang.NonNull;
 import org.springframework.lang.Nullable;
 import org.springframework.util.Assert;
 
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.stream.Collectors;
 
 /**
- * 数据校验类
+ * 数据验证器类
  *
  * @author obby-xiang
  * @since 2021-01-28
@@ -27,37 +26,37 @@ public class Validator {
     public static final String ATTRIBUTE_OF_DATA = "*";
 
     /**
-     * 校验对象属性
+     * 字段级验证器列表
      */
-    private final List<String> attributes;
+    private final List<FieldValidator<?>> fieldValidators;
 
     /**
-     * 自定义属性
+     * 验证回调
      */
-    private final Map<String, String> customAttributes;
+    private CallbackClosure callback;
 
     /**
-     * 校验规则
+     * 验证条件
      */
-    private final Map<String, List<Rule<?>>> rules;
+    private ConditionClosure<Object> condition;
 
     /**
-     * 校验失败消息
+     * 是否在首次验证失败后停止验证
+     */
+    private boolean bail;
+
+    /**
+     * 是否在验证失败后抛出异常
+     */
+    private boolean abort;
+
+    /**
+     * 验证失败消息
      */
     private final Map<String, List<String>> errors;
 
     /**
-     * 自定义属性校验失败消息
-     */
-    private final Map<String, List<String>> failedMessages;
-
-    /**
-     * 校验对象属性值
-     */
-    private final Map<String, Object> values;
-
-    /**
-     * 校验对象
+     * 验证对象
      */
     private Object data;
 
@@ -65,247 +64,546 @@ public class Validator {
      * 构造
      */
     public Validator() {
-        this.attributes = new ArrayList<>();
-        this.customAttributes = new HashMap<>();
-        this.rules = new HashMap<>();
+        this.fieldValidators = new ArrayList<>();
         this.errors = new HashMap<>();
-        this.failedMessages = new HashMap<>();
-        this.values = new HashMap<>();
     }
 
     /**
-     * 校验对象属性
+     * 创建数据验证器
      *
-     * @return 校验对象属性
+     * @return 数据验证器
      */
-    public List<String> attributes() {
-        return this.attributes;
+    public static Validator create() {
+        return new Validator();
     }
 
     /**
-     * 自定义属性
+     * 设置字段级验证器
      *
-     * @return 自定义属性
+     * @param fieldValidator 字段级验证器
+     * @return 数据验证器
      */
-    public Map<String, String> customAttributes() {
-        return this.customAttributes;
+    public Validator fieldValidator(@NonNull FieldValidator<?> fieldValidator) {
+        Assert.notNull(fieldValidator, "[fieldValidator] must not be null");
+
+        this.fieldValidators.add(fieldValidator);
+
+        return this;
     }
 
     /**
-     * 校验规则
+     * 设置字段级验证器列表
      *
-     * @return 校验规则
+     * @param fieldValidators 字段级验证器列表
+     * @return 数据验证器
      */
-    public Map<String, List<Rule<?>>> rules() {
-        return this.rules;
+    public Validator fieldValidators(@NonNull List<FieldValidator<?>> fieldValidators) {
+        Assert.notEmpty(fieldValidators, "[fieldValidators] must not be empty");
+        Assert.noNullElements(fieldValidators, "[fieldValidators] must not contain any null elements");
+
+        this.fieldValidators.addAll(fieldValidators);
+
+        return this;
     }
 
     /**
-     * 属性校验规则
+     * 设置验证回调
      *
-     * @param attribute 属性
-     * @return 校验规则
+     * @param callback 验证回调
+     * @return 数据验证器
      */
-    public List<Rule<?>> rules(String attribute) {
-        return this.rules.getOrDefault(attribute, new ArrayList<>());
+    public Validator callback(@Nullable CallbackClosure callback) {
+        this.callback = callback;
+
+        return this;
     }
 
     /**
-     * 校验失败消息
+     * 设置验证条件
      *
-     * @return 校验失败消息
+     * @param condition 验证条件
+     * @return 数据验证器
+     */
+    public Validator condition(@Nullable ConditionClosure<Object> condition) {
+        this.condition = condition;
+
+        return this;
+    }
+
+    /**
+     * 设置是否在首次验证失败后停止验证
+     *
+     * @param bail 是否在首次验证失败后停止验证
+     * @return 数据验证器
+     */
+    public Validator bail(boolean bail) {
+        this.bail = bail;
+
+        return this;
+    }
+
+    /**
+     * 设置是否在验证失败后抛出异常
+     *
+     * @param abort 是否在验证失败后抛出异常
+     * @return 数据验证器
+     */
+    public Validator abort(boolean abort) {
+        this.abort = abort;
+
+        return this;
+    }
+
+    /**
+     * 字段级验证器列表
+     *
+     * @return 字段级验证器列表
+     */
+    public List<FieldValidator<?>> fieldValidators() {
+        return this.fieldValidators;
+    }
+
+    /**
+     * 验证回调
+     *
+     * @return 验证回调
+     */
+    public CallbackClosure callback() {
+        return this.callback;
+    }
+
+    /**
+     * 验证条件
+     *
+     * @return 验证条件
+     */
+    public ConditionClosure<Object> condition() {
+        return this.condition;
+    }
+
+    /**
+     * 是否在首次验证失败后停止验证
+     *
+     * @return 是否在首次验证失败后停止验证
+     */
+    public boolean bail() {
+        return this.bail;
+    }
+
+    /**
+     * 是否在验证失败后抛出异常
+     *
+     * @return 是否在验证失败后抛出异常
+     */
+    public boolean abort() {
+        return this.abort;
+    }
+
+    /**
+     * 验证失败消息
+     *
+     * @return 验证失败消息
      */
     public Map<String, List<String>> errors() {
         return this.errors;
     }
 
     /**
-     * 属性校验失败消息
+     * 验证失败消息
      *
-     * @param attribute 属性
-     * @return 校验失败消息
+     * @param attribute 验证字段属性
+     * @return 验证失败消息
      */
     public List<String> errors(String attribute) {
         return this.errors.getOrDefault(attribute, new ArrayList<>());
     }
 
     /**
-     * 自定义属性校验失败消息
+     * 是否验证失败
      *
-     * @return 自定义属性校验失败消息
-     */
-    public Map<String, List<String>> failedMessages() {
-        return this.failedMessages;
-    }
-
-    /**
-     * 校验对象
-     *
-     * @return 校验对象
-     */
-    public Object data() {
-        return this.data;
-    }
-
-    /**
-     * 设置校验对象
-     *
-     * @param data 校验对象
-     * @return 数据校验
-     */
-    public Validator data(Object data) {
-        Assert.notNull(data, "[data] must not be null");
-
-        this.data = data;
-
-        return this;
-    }
-
-    /**
-     * 增加校验规则
-     *
-     * @param attribute 属性
-     * @param rules     规则
-     * @return 数据校验
-     */
-    public Validator rule(String attribute, Rule<?>... rules) {
-        return this.rule(attribute, null, rules);
-    }
-
-    /**
-     * 增加校验规则
-     *
-     * @param attribute       属性
-     * @param customAttribute 自定义属性
-     * @param rules           规则
-     * @return 数据校验
-     */
-    public Validator rule(String attribute, @Nullable String customAttribute, Rule<?>... rules) {
-        Assert.notNull(attribute, "[attribute] must not be null");
-        Assert.notEmpty(rules, "[rules] must not be empty");
-        Assert.noNullElements(rules, "[rules] must not contain any null elements");
-
-        this.attributes.remove(attribute);
-        this.attributes.add(attribute);
-
-        if (customAttribute == null) {
-            this.customAttributes.remove(attribute);
-        } else {
-            this.customAttributes.put(attribute, customAttribute);
-        }
-
-        this.rules.put(attribute, Arrays.stream(rules).collect(Collectors.toList()));
-
-        return this;
-    }
-
-    /**
-     * 移除校验规则
-     */
-    public void removeRules() {
-        this.attributes.clear();
-        this.customAttributes.clear();
-        this.rules.clear();
-    }
-
-    /**
-     * 属性移除校验规则
-     *
-     * @param attribute 属性
-     * @return 是否移除成功
-     */
-    public boolean removeRules(String attribute) {
-        if (this.attributes.contains(attribute)) {
-            this.attributes.remove(attribute);
-            this.customAttributes.remove(attribute);
-            this.rules.remove(attribute);
-
-            return true;
-        }
-
-        return false;
-    }
-
-    public void validate() {
-        Assert.notNull(this.data, "[data] must not be null");
-        Assert.notEmpty(this.rules, "[rules] must not be empty");
-
-        this.errors.clear();
-        this.failedMessages.clear();
-        this.values.clear();
-
-        this.fillValues();
-
-        for (String attr : this.attributes) {
-            Object value = this.values.get(attr);
-            List<String> messages = new ArrayList<>();
-
-            for (Rule<?> rule : this.rules(attr)) {
-                rule.validate(value);
-
-                if (rule.failed()) {
-                    messages.add(rule.failedMessage());
-                }
-            }
-
-            if (!messages.isEmpty()) {
-                this.errors.put(attr, messages);
-
-                String customAttribute = this.customAttributes.getOrDefault(attr, attr);
-
-                if (this.failedMessages.containsKey(customAttribute)) {
-                    this.failedMessages.get(customAttribute).addAll(messages);
-                } else {
-                    this.failedMessages.put(customAttribute, new ArrayList<>(messages));
-                }
-            }
-        }
-    }
-
-    /**
-     * 是否校验失败
-     *
-     * @return 是否校验失败
+     * @return 是否验证失败
      */
     public boolean failed() {
         return !this.errors().isEmpty();
     }
 
     /**
-     * 属性是否校验失败
+     * 是否验证失败
      *
-     * @param attribute 属性
-     * @return 是否校验失败
+     * @param attribute 验证字段属性
+     * @return 是否验证失败
      */
     public boolean failed(String attribute) {
         return !this.errors(attribute).isEmpty();
     }
 
     /**
-     * 填充属性值
+     * 验证对象
+     *
+     * @return 验证对象
      */
-    private void fillValues() {
+    public Object data() {
+        return this.data;
+    }
+
+    /**
+     * 验证数据
+     *
+     * @param data 验证对象
+     */
+    public void validate(Object data) {
+        this.data = data;
+
+        this.validate();
+    }
+
+    /**
+     * 验证数据
+     */
+    private void validate() {
+        this.errors.clear();
+
+        if (this.condition == null || this.condition.accept(this.data)) {
+            for (FieldValidator<?> validator : this.fieldValidators) {
+                validator.validate(this.getValue(validator.attribute()));
+
+                if (validator.failed()) {
+                    String attribute = ObjectUtils.defaultIfNull(validator.customAttribute(), validator.attribute());
+
+                    if (!this.errors.containsKey(attribute)) {
+                        this.errors.put(attribute, new ArrayList<>());
+                    }
+
+                    this.errors.get(attribute).addAll(validator.errors());
+
+                    if (this.bail) {
+                        break;
+                    }
+                }
+            }
+
+            if (this.callback != null) {
+                this.callback.call(this);
+            }
+
+            if (this.abort && this.failed()) {
+                throw new ValidationException(this.errors());
+            }
+        }
+    }
+
+    /**
+     * 获取验证字段值
+     *
+     * @param attribute 验证字段属性
+     * @return 验证字段值
+     */
+    private Object getValue(String attribute) {
+        if (ATTRIBUTE_OF_DATA.equals(attribute) || this.data == null) {
+            return this.data;
+        }
+
         if (this.data instanceof Map) {
-            Map<?, ?> model = (Map<?, ?>) this.data;
-
-            for (String attr : this.attributes) {
-                if (!ATTRIBUTE_OF_DATA.equals(attr)) {
-                    this.values.put(attr, model.get(attr));
-                }
-            }
+            return ((Map<?, ?>) this.data).get(attribute);
         } else {
-            BeanWrapper model = new BeanWrapperImpl(this.data);
+            try {
+                return new DirectFieldAccessor(this.data).getPropertyValue(attribute);
+            } catch (Exception e) {
+                logger.debug("get value failed", e);
 
-            for (String attr : this.attributes) {
-                if (!ATTRIBUTE_OF_DATA.equals(attr)) {
-                    this.values.put(attr, model.getPropertyValue(attr));
+                return null;
+            }
+        }
+    }
+
+    /**
+     * 数据验证回调接口
+     */
+    @FunctionalInterface
+    public interface CallbackClosure {
+
+        /**
+         * 数据验证回调
+         *
+         * @param validator 数据验证器
+         */
+        void call(Validator validator);
+
+    }
+
+    /**
+     * 数据验证条件接口
+     *
+     * @param <T> 验证对象类型
+     */
+    @FunctionalInterface
+    public interface ConditionClosure<T> {
+
+        /**
+         * 是否符合验证条件
+         *
+         * @param data 验证对象
+         * @return 是否符合验证条件
+         */
+        boolean accept(T data);
+
+    }
+
+    /**
+     * 字段级数据验证器
+     *
+     * @param <T> 验证字段类型
+     */
+    public static class FieldValidator<T> {
+
+        private static final String DEFAULT_ATTRIBUTE = ATTRIBUTE_OF_DATA;
+
+        /**
+         * 验证字段属性
+         */
+        private String attribute;
+
+        /**
+         * 自定义验证字段属性
+         */
+        private String customAttribute;
+
+        /**
+         * 验证规则
+         */
+        private final List<Rule<? super T, ?>> rules;
+
+        /**
+         * 验证条件
+         */
+        private ConditionClosure<T> condition;
+
+        /**
+         * 是否在首次验证失败后停止验证
+         */
+        private boolean bail;
+
+        /**
+         * 验证失败消息
+         */
+        private final List<String> errors;
+
+        /**
+         * 验证字段值
+         */
+        private T value;
+
+        /**
+         * 构造
+         */
+        public FieldValidator() {
+            this.attribute = DEFAULT_ATTRIBUTE;
+            this.rules = new ArrayList<>();
+            this.errors = new ArrayList<>();
+        }
+
+        /**
+         * 创建字段级数据验证器
+         *
+         * @param <T> 验证字段类型
+         * @return 字段级数据验证器
+         */
+        public static <T> FieldValidator<T> create() {
+            return new FieldValidator<>();
+        }
+
+        /**
+         * 设置验证字段属性
+         *
+         * @param attribute 验证字段属性
+         * @return 字段级数据验证器
+         */
+        public FieldValidator<T> attribute(@NonNull String attribute) {
+            Assert.notNull(attribute, "[attribute] must not be null");
+
+            this.attribute = attribute;
+
+            return this;
+        }
+
+        /**
+         * 设置自定义验证字段属性
+         *
+         * @param customAttribute 自定义验证字段属性
+         * @return 字段级数据验证器
+         */
+        public FieldValidator<T> customAttribute(@Nullable String customAttribute) {
+            this.customAttribute = customAttribute;
+
+            return this;
+        }
+
+        /**
+         * 设置验证规则
+         *
+         * @param rule 验证规则
+         * @return 字段级数据验证器
+         */
+        public FieldValidator<T> rule(@NonNull Rule<? super T, ?> rule) {
+            Assert.notNull(rule, "[rule] must not be null");
+
+            this.rules.add(rule);
+
+            return this;
+        }
+
+        /**
+         * 设置验证规则列表
+         *
+         * @param rules 验证规则列表
+         * @return 字段级数据验证器
+         */
+        public FieldValidator<T> rules(@NonNull List<Rule<? super T, ?>> rules) {
+            Assert.notEmpty(rules, "[rules] must not be empty");
+            Assert.noNullElements(rules, "[rules] must not contain any null elements");
+
+            this.rules.addAll(rules);
+
+            return this;
+        }
+
+        /**
+         * 设置验证条件
+         *
+         * @param condition 验证条件
+         * @return 字段级数据验证器
+         */
+        public FieldValidator<T> condition(@Nullable ConditionClosure<T> condition) {
+            this.condition = condition;
+
+            return this;
+        }
+
+        /**
+         * 设置是否在首次验证失败后停止验证
+         *
+         * @param bail 是否在首次验证失败后停止验证
+         * @return 字段级数据验证器
+         */
+        public FieldValidator<T> bail(boolean bail) {
+            this.bail = bail;
+
+            return this;
+        }
+
+        /**
+         * 验证字段属性
+         *
+         * @return 验证字段属性
+         */
+        public String attribute() {
+            return this.attribute;
+        }
+
+        /**
+         * 自定义验证字段属性
+         *
+         * @return 自定义验证字段属性
+         */
+        public String customAttribute() {
+            return this.customAttribute;
+        }
+
+        /**
+         * 验证规则
+         *
+         * @return 验证规则
+         */
+        public List<Rule<? super T, ?>> rules() {
+            return this.rules;
+        }
+
+        /**
+         * 验证条件
+         *
+         * @return 验证条件
+         */
+        public ConditionClosure<T> condition() {
+            return this.condition;
+        }
+
+        /**
+         * 是否在首次验证失败后停止验证
+         *
+         * @return 是否在首次验证失败后停止验证
+         */
+        public boolean bail() {
+            return this.bail;
+        }
+
+        /**
+         * 验证失败消息
+         *
+         * @return 验证失败消息
+         */
+        public List<String> errors() {
+            return this.errors;
+        }
+
+        /**
+         * 验证字段值
+         *
+         * @return 验证字段值
+         */
+        public T value() {
+            return this.value;
+        }
+
+        /**
+         * 是否验证失败
+         *
+         * @return 是否验证失败
+         */
+        public boolean failed() {
+            return !this.errors.isEmpty();
+        }
+
+        /**
+         * 验证数据
+         *
+         * @param value 验证字段值
+         */
+        @SuppressWarnings("unchecked")
+        public void validate(Object value) {
+            try {
+                this.value = (T) value;
+            } catch (Exception e) {
+                logger.debug("cast value failed", e);
+
+                throw new IllegalArgumentException(
+                        "[" + this.getClass() + "] may not support [" + value.getClass() + "]"
+                );
+            }
+
+            this.validate();
+        }
+
+        /**
+         * 验证数据
+         */
+        private void validate() {
+            this.errors.clear();
+
+            if (this.condition == null || this.condition.accept(this.value)) {
+                for (Rule<? super T, ?> rule : this.rules) {
+                    rule.validate(this.value);
+
+                    if (rule.failed()) {
+                        this.errors.add(rule.failedMessage());
+
+                        if (this.bail) {
+                            break;
+                        }
+                    }
                 }
             }
         }
 
-        if (this.attributes.contains(ATTRIBUTE_OF_DATA)) {
-            this.values.put(ATTRIBUTE_OF_DATA, this.data);
-        }
     }
 
 }

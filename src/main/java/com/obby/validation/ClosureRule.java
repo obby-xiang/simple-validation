@@ -4,27 +4,28 @@ import org.springframework.lang.NonNull;
 import org.springframework.util.Assert;
 
 /**
- * 闭包校验规则类
+ * 闭包数据验证规则类
  *
+ * @param <T> 验证对象类型
  * @author obby-xiang
  * @since 2021-01-28
  */
-public class ClosureRule<T> extends Rule<T> {
+public class ClosureRule<T> extends Rule<T, ClosureRule<T>> {
 
     /**
-     * 校验规则闭包
+     * 验证规则闭包
      */
     private final RuleClosure<T> closure;
 
     /**
-     * 闭包是否校验失败
+     * 规则闭包是否验证失败
      */
     private boolean closureFailed;
 
     /**
      * 构造
      *
-     * @param closure 校验规则闭包
+     * @param closure 验证规则闭包
      */
     public ClosureRule(@NonNull RuleClosure<T> closure) {
         Assert.notNull(closure, "[closure] must not be null");
@@ -33,9 +34,9 @@ public class ClosureRule<T> extends Rule<T> {
     }
 
     /**
-     * 默认消息
+     * 默认验证消息
      *
-     * @return 默认消息
+     * @return 默认验证消息
      */
     @Override
     public String defaultMessage() {
@@ -43,7 +44,7 @@ public class ClosureRule<T> extends Rule<T> {
     }
 
     /**
-     * 测试
+     * 测试数据
      *
      * @param data 测试对象
      * @return 是否通过测试
@@ -52,42 +53,39 @@ public class ClosureRule<T> extends Rule<T> {
     public boolean test(T data) {
         this.closureFailed = false;
 
-        this.closure.validate(data, (message) -> {
-            this.closureFailed = true;
-            this.customMessage(message);
-        });
+        this.closure.validate(data, (message) -> this.customMessage(message).closureFailed = true);
 
         return !this.closureFailed;
     }
 
     /**
-     * 校验规则闭包接口
+     * 数据验证规则闭包接口
      *
-     * @param <T> 校验对象类型
+     * @param <T> 验证对象类型
      */
     @FunctionalInterface
     public interface RuleClosure<T> {
 
         /**
-         * 校验
+         * 验证数据
          *
-         * @param data 校验对象
-         * @param fail 校验失败闭包
+         * @param data 验证对象
+         * @param fail 验证失败闭包
          */
         void validate(T data, FailClosure fail);
 
     }
 
     /**
-     * 校验失败闭包接口
+     * 数据验证失败闭包接口
      */
     @FunctionalInterface
     public interface FailClosure {
 
         /**
-         * 设置校验失败消息
+         * 设置验证失败消息
          *
-         * @param message 校验失败消息
+         * @param message 验证失败消息
          */
         void message(String message);
 

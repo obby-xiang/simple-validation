@@ -1,3 +1,3 @@
 # simple-validation
 
-数据校验
+数据验证

@@ -8,41 +8,48 @@ import org.slf4j.LoggerFactory;
 import org.springframework.context.i18n.LocaleContextHolder;
 
 /**
- * 校验规则抽象类
+ * 数据验证规则抽象类
  *
+ * @param <T> 验证对象类型
+ * @param <B> 验证规则子类类型
  * @author obby-xiang
  * @since 2021-01-28
  */
-public abstract class Rule<T> {
+public abstract class Rule<T, B extends Rule<T, B>> {
 
     private static final Logger logger = LoggerFactory.getLogger(Rule.class);
 
     public static final String DEFAULT_MESSAGE = "validation.invalid";
 
     /**
-     * 是否校验失败
+     * 验证对象
+     */
+    private T data;
+
+    /**
+     * 是否验证失败
      */
     private boolean failed;
 
     /**
-     * 校验失败消息
+     * 验证失败消息
      */
     private String failedMessage;
 
     /**
-     * 自定义消息
+     * 自定义验证消息
      */
     private String customMessage;
 
     /**
-     * 默认消息
+     * 默认验证消息
      *
-     * @return 默认消息
+     * @return 默认验证消息
      */
     public abstract String defaultMessage();
 
     /**
-     * 测试
+     * 测试数据
      *
      * @param data 测试对象
      * @return 是否通过测试
@@ -50,64 +57,70 @@ public abstract class Rule<T> {
     public abstract boolean test(T data);
 
     /**
-     * 是否校验失败
+     * 设置自定义验证消息
      *
-     * @return 是否校验失败
+     * @param customMessage 自定义验证消息
+     * @return 数据验证规则
+     */
+    @SuppressWarnings("unchecked")
+    public B customMessage(String customMessage) {
+        this.customMessage = customMessage;
+
+        return (B) this;
+    }
+
+    /**
+     * 验证对象
+     *
+     * @return 验证对象
+     */
+    public T data() {
+        return this.data;
+    }
+
+    /**
+     * 是否验证失败
+     *
+     * @return 是否验证失败
      */
     public boolean failed() {
         return this.failed;
     }
 
     /**
-     * 校验失败消息
+     * 验证失败消息
      *
-     * @return 校验失败消息
+     * @return 验证失败消息
      */
     public String failedMessage() {
         return this.failedMessage;
     }
 
     /**
-     * 自定义消息
+     * 自定义验证消息
      *
-     * @return 自定义消息
+     * @return 自定义验证消息
      */
     public String customMessage() {
         return this.customMessage;
     }
 
     /**
-     * 设置自定义消息
+     * 验证数据
      *
-     * @param customMessage 自定义消息
-     * @return 校验规则
+     * @param data 验证对象
      */
-    public Rule<T> customMessage(String customMessage) {
-        this.customMessage = customMessage;
+    public void validate(T data) {
+        this.data = data;
 
-        return this;
+        this.validate();
     }
 
     /**
-     * 校验
-     *
-     * @param data 校验对象
+     * 验证数据
      */
-    @SuppressWarnings("unchecked")
-    public void validate(Object data) {
-        T value = null;
-
-        if (data != null) {
-            try {
-                value = (T) data;
-            } catch (Exception e) {
-                throw new IllegalArgumentException(
-                        "[" + this.getClass() + "] does not support [" + data.getClass() + "]"
-                );
-            }
-        }
-
-        if (this.failed = !this.test(value)) {
+    private void validate() {
+        if (this.failed = !this.test(this.data)) {
             String message = ObjectUtils.defaultIfNull(
                     ObjectUtils.defaultIfNull(this.customMessage(), this.defaultMessage()),
                     DEFAULT_MESSAGE
@@ -116,9 +129,7 @@ public abstract class Rule<T> {
             message = App.context().getMessage(message, null, message, LocaleContextHolder.getLocale());
 
             try {
-                this.failedMessage = Mustache.compiler()
-                        .defaultValue("{{{name}}}").escapeHTML(false)
-                        .compile(message).execute(this);
+                this.failedMessage = Mustache.compiler().defaultValue("{{{name}}}").compile(message).execute(this);
             } catch (Exception e) {
                 logger.debug("process message template failed", e);
 
