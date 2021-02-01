@@ -73,7 +73,7 @@ public class Validator {
      *
      * @return 数据验证器
      */
-    public static Validator create() {
+    public static Validator make() {
         return new Validator();
     }
 
@@ -287,7 +287,7 @@ public class Validator {
             }
 
             if (this.abort && this.failed()) {
-                throw new ValidationException(this.errors());
+                throw ValidationException.make(this.errors());
             }
         }
     }
@@ -408,7 +408,7 @@ public class Validator {
          * @param <T> 验证字段类型
          * @return 字段级数据验证器
          */
-        public static <T> FieldValidator<T> create() {
+        public static <T> FieldValidator<T> make() {
             return new FieldValidator<>();
         }
 

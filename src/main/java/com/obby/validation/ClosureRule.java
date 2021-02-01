@@ -34,6 +34,17 @@ public class ClosureRule<T> extends Rule<T, ClosureRule<T>> {
     }
 
     /**
+     * 创建闭包数据验证规则
+     *
+     * @param closure 验证规则闭包
+     * @param <T>     验证对象类型
+     * @return 包数据验证规则
+     */
+    public static <T> ClosureRule<T> make(@NonNull RuleClosure<T> closure) {
+        return new ClosureRule<>(closure);
+    }
+
+    /**
      * 默认验证消息
      *
      * @return 默认验证消息

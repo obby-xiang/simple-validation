@@ -4,12 +4,21 @@ import com.obby.validation.Rule;
 import org.apache.commons.lang3.ObjectUtils;
 
 /**
- * 必填数据验证类
+ * 必填数据验证规则类
  *
  * @author obby-xiang
  * @since 2021-01-28
  */
 public class Required extends Rule<Object, Required> {
+
+    /**
+     * 创建必填数据验证规则
+     *
+     * @return 必填数据验证规则
+     */
+    public static Required make() {
+        return new Required();
+    }
 
     /**
      * 默认验证消息

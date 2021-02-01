@@ -43,4 +43,25 @@ public class ValidationException extends RuntimeException {
         this.errors = errors;
     }
 
+    /**
+     * 创建数据验证失败异常
+     *
+     * @param errors 验证失败消息
+     * @return 数据验证失败异常
+     */
+    public static ValidationException make(Map<String, List<String>> errors) {
+        return new ValidationException(errors);
+    }
+
+    /**
+     * 创建数据验证失败异常
+     *
+     * @param message 异常消息
+     * @param errors  验证失败消息
+     * @return 数据验证失败异常
+     */
+    public static ValidationException make(String message, Map<String, List<String>> errors) {
+        return new ValidationException(message, errors);
+    }
+
 }

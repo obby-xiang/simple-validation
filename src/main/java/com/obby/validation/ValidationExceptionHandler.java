@@ -19,6 +19,12 @@ public class ValidationExceptionHandler {
     @Autowired
     private Gson gson;
 
+    /**
+     * 处理数据验证失败异常
+     *
+     * @param exception 数据验证失败异常
+     * @return 响应实体
+     */
     @ExceptionHandler(ValidationException.class)
     public ResponseEntity<String> handle(ValidationException exception) {
         return ResponseEntity.unprocessableEntity().body(

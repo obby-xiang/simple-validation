@@ -1,10 +1,64 @@
-<!DOCTYPE html>
-<html lang="en">
+<!doctype html>
+<html xmlns:th="https://www.thymeleaf.org" th:lang="${#locale.toLanguageTag()}">
 <head>
-    <meta charset="UTF-8">
-    <title>Title</title>
+    <title>Simple Validation</title>
 </head>
 <body>
+    <div id="app">
+        <div>
+            <div>
+                <label for="foo">Foo</label>
+                <input id="foo" v-model="form.foo">
+                <span v-if="!!errors.foo">{{ errors.foo[0] }}</span>
+            </div>
+            <div>
+                <label for="bar">Bar</label>
+                <input id="bar" v-model="form.bar">
+                <span v-if="!!errors.bar">{{ errors.bar[0] }}</span>
+            </div>
 
+            <button @click="validate">validate</button>
+            <span v-if="!!message">{{ message }}</span>
+        </div>
+    </div>
+
+    <!-- Axios -->
+    <script src="https://cdn.jsdelivr.net/npm/axios/dist/axios.min.js"></script>
+
+    <!-- Vue -->
+    <script src="https://cdn.jsdelivr.net/npm/vue"></script>
+
+    <script>
+        new Vue({
+            el: '#app',
+            data() {
+                return {
+                    form: {
+                        foo: null,
+                        bar: null,
+                    },
+                    message: null,
+                    errors: {},
+                };
+            },
+            methods: {
+                validate() {
+                    this.message = null;
+                    this.errors = {};
+
+                    axios.post('/', this.form).then((res) => {
+                        this.message = res.data;
+                    }).catch((err) => {
+                        if (err.response.status === 422) {
+                            this.message = err.response.data.message;
+                            this.errors = err.response.data.errors;
+                        } else {
+                            this.message = err.message;
+                        }
+                    });
+                },
+            },
+        });
+    </script>
 </body>
 </html>
