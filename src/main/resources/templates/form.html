@@ -97,11 +97,11 @@
                     axios.post('/', this.form).then((res) => {
                         this.message = res.data;
                     }).catch((err) => {
-                        if (err.response.status === 422) {
+                        if (_.get(err, 'response.status') === 422) {
                             this.message = err.response.data.message;
                             this.errors = err.response.data.errors;
                         } else {
-                            this.message = err.message;
+                            alert(_.defaultTo(err.message, 'Request failed.'));
                         }
                     });
                 },
