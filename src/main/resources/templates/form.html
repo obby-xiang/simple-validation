@@ -1,36 +1,84 @@
 <!doctype html>
 <html xmlns:th="https://www.thymeleaf.org" th:lang="${#locale.toLanguageTag()}">
 <head>
+    <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, minimal-ui">
     <title>Simple Validation</title>
+
+    <!-- Vuetify -->
+    <link href="https://cdn.jsdelivr.net/npm/vuetify@2.x/dist/vuetify.min.css" rel="stylesheet">
 </head>
 <body>
     <div id="app">
-        <div>
-            <div>
-                <label for="foo">Foo</label>
-                <input id="foo" v-model="form.foo">
-                <span v-if="!!errors.foo">{{ errors.foo[0] }}</span>
-            </div>
-            <div>
-                <label for="bar">Bar</label>
-                <input id="bar" v-model="form.bar">
-                <span v-if="!!errors.bar">{{ errors.bar[0] }}</span>
-            </div>
+        <v-app>
+            <v-main>
+                <v-container class="pa-6">
+                    <v-row justify="center">
+                        <v-col cols="12" sm="8" md="6" lg="4">
+                            <h1 class="text-center">Simple Validation</h1>
 
-            <button @click="validate">validate</button>
-            <span v-if="!!message">{{ message }}</span>
-        </div>
+                            <div class="text-center my-3">
+                                <v-menu offset-y>
+                                    <template v-slot:activator="{ on: menu, attrs }">
+                                        <v-tooltip bottom>
+                                            <template v-slot:activator="{ on: tooltip }">
+                                                <v-btn color="success" class="text-none" v-bind="attrs"
+                                                       v-on="{ ...tooltip, ...menu }"
+                                                       th:text="${#locale.toLanguageTag()}" dark></v-btn>
+                                            </template>
+                                            <span>Language</span>
+                                        </v-tooltip>
+                                    </template>
+                                    <v-list>
+                                        <v-list-item v-for="lang in ['en-US', 'zh-CN']" :key="lang"
+                                                     :href="'/?lang=' + lang">
+                                            <v-list-item-title>{{ lang }}</v-list-item-title>
+                                        </v-list-item>
+                                    </v-list>
+                                </v-menu>
+                            </div>
+
+                            <v-form ref="form" class="my-6">
+                                <v-text-field label="Foo" v-model="form.foo"
+                                              :error-messages="errors.foo"></v-text-field>
+                                <v-text-field label="Bar" v-model="form.bar"
+                                              :error-messages="errors.bar"></v-text-field>
+
+                                <v-row justify="center">
+                                    <v-col cols="auto">
+                                        <v-btn @click="validate" color="primary" class="ma-3" dark>Validate</v-btn>
+                                        <v-btn @click="reset" class="ma-3">Reset</v-btn>
+                                    </v-col>
+                                </v-row>
+                            </v-form>
+
+                            <v-alert v-if="!!message" :type="_.isEmpty(errors) ? 'success' : 'error'" text outlined>
+                                {{ message }}
+                            </v-alert>
+                        </v-col>
+                    </v-row>
+                </v-container>
+            </v-main>
+        </v-app>
     </div>
+
+    <!-- Lodash -->
+    <script src="https://cdn.jsdelivr.net/npm/lodash@4.17.20/lodash.min.js"></script>
 
     <!-- Axios -->
     <script src="https://cdn.jsdelivr.net/npm/axios/dist/axios.min.js"></script>
 
     <!-- Vue -->
-    <script src="https://cdn.jsdelivr.net/npm/vue"></script>
+    <script src="https://cdn.jsdelivr.net/npm/vue@2.x/dist/vue.js"></script>
+
+    <!-- Vuetify -->
+    <script src="https://cdn.jsdelivr.net/npm/vuetify@2.x/dist/vuetify.js"></script>
 
     <script>
+        Vue.prototype._ = _;
+
         new Vue({
             el: '#app',
+            vuetify: new Vuetify(),
             data() {
                 return {
                     form: {
@@ -56,6 +104,11 @@
                             this.message = err.message;
                         }
                     });
+                },
+                reset() {
+                    this.message = null;
+                    this.errors = {};
+                    this.$refs.form.reset();
                 },
             },
         });
